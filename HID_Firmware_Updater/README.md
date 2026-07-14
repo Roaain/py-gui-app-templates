@@ -1,7 +1,6 @@
 # HID 韌體更新工具
 
 基於 **PySide6** + **hidapi** 的 HID 韌體更新 GUI 應用程式。
-VSCode + PySide6 + UPX + Nuitka
 
 ## 快速開始
 
