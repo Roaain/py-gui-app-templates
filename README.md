@@ -1,2 +1,2 @@
-# py-gui-app-template
+# py-gui-app-templates
 Build and compile beautiful Python GUI applications.
