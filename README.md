@@ -1,2 +1,2 @@
 # py-gui-app-template
-VSCode + PySide6 + UPX + Nuitka
+Build and compile beautiful Python GUI applications.
