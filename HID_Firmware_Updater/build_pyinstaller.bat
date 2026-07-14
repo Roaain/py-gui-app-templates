@@ -1,8 +1,10 @@
 @echo off
 chcp 65001 >nul
+goto :start
+
+:start
 setlocal
 
-REM 檢查是否提供檔名參數
 if "%~1"=="" (
     echo [錯誤] 請提供輸出的執行檔名稱！
     echo 範例: %0 HIDFirmwareUpdater
@@ -12,18 +14,11 @@ if "%~1"=="" (
 set EXE_NAME=%~1
 
 echo ========================================================
-echo 開始使用 Nuitka 編譯 %EXE_NAME%.exe ...
+echo 開始使用 PyInstaller 編譯 %EXE_NAME%.exe ...
 echo ========================================================
 echo.
 
-python -m nuitka ^
-    --standalone ^
-    --onefile ^
-    --enable-plugin=pyside6 ^
-    --windows-disable-console ^
-    --output-dir=dist ^
-    --output-filename="%EXE_NAME%.exe" ^
-    main.py
+pyinstaller -F -w -n "%EXE_NAME%" main.py
 
 if %ERRORLEVEL% equ 0 (
     echo.

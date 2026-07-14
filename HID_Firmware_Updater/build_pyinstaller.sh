@@ -1,27 +1,19 @@
 #!/bin/bash
 
-# 檢查是否提供檔名參數
 if [ -z "$1" ]; then
     echo "[錯誤] 請提供輸出的執行檔名稱！"
-    echo "範例: ./build_nuitka.sh HIDFirmwareUpdater"
+    echo "範例: ./build_pyinstaller.sh HIDFirmwareUpdater"
     exit 1
 fi
 
 EXE_NAME="$1"
 
 echo "========================================================"
-echo "開始使用 Nuitka 編譯 ${EXE_NAME}.exe ..."
+echo "開始使用 PyInstaller 編譯 ${EXE_NAME}.exe ..."
 echo "========================================================"
 echo ""
 
-python -m nuitka \
-    --standalone \
-    --onefile \
-    --enable-plugin=pyside6 \
-    --windows-disable-console \
-    --output-dir=dist \
-    --output-filename="${EXE_NAME}.exe" \
-    main.py
+pyinstaller -F -w -n "${EXE_NAME}" main.py
 
 if [ $? -eq 0 ]; then
     echo ""

@@ -11,8 +11,13 @@
 3. [將 UI 轉換為 Python 程式碼](#3-將-ui-轉換為-python-程式碼)
 4. [在 VSCode 中開發主程式](#4-在-vscode-中開發主程式)
 5. [整合 HID 通訊範例](#5-整合-hid-通訊範例)
-6. [打包成單一執行檔 (.exe)](#6-打包成單一執行檔-exe)
-7. [常見問題與排錯](#7-常見問題與排錯)
+6. [封裝與發布：基礎打包 (PyInstaller)](#6-封裝與發布基礎打包-pyinstaller)
+7. [封裝與發布：進階壓縮與最佳化](#7-封裝與發布進階壓縮與最佳化)
+8. [封裝與發布：終極方案 (Nuitka)](#8-封裝與發布終極方案-nuitka)
+9. [常見問題與排錯](#9-常見問題與排錯)
+10. [清理專案暫存檔案](#10-清理專案暫存檔案)
+11. [專案結構建議](#11-專案結構建議)
+12. [總結](#12-總結)
 
 ---
 
@@ -268,15 +273,23 @@ if __name__ == "__main__":
 
 ---
 
-## 6. 打包成單一執行檔 (.exe)
+## 6. 封裝與發布：基礎打包 (PyInstaller)
 
-使用 **PyInstaller** 將整個專案打包成一個獨立的 `.exe` 檔案。
+使用 **PyInstaller** 是 Python 專案中最常見的打包方式，可以將整個專案打包成一個獨立的 `.exe` 檔案。
 
-### 6.1 準備 `.spec` 檔案（可選）
-PyInstaller 會自動生成，但若需自訂（如加入非 Python 資源），可參考。
+### 6.1 使用自動化腳本打包 (推薦)
+為了簡化打包流程，專案內提供了自動化腳本：
+- **Windows**: `build_pyinstaller.bat`
+- **Linux/Git Bash**: `build_pyinstaller.sh`
 
-### 6.2 執行打包命令
-在專案根目錄下執行：
+只需在終端機中執行腳本並傳入專案名稱：
+```cmd
+.\build_pyinstaller.bat HIDFirmwareUpdater
+```
+打包完成後，獨立的 `.exe` 檔案會自動輸出到 `dist` 資料夾中。
+
+### 6.2 手動執行打包命令
+如果您想手動執行，請在專案根目錄下輸入：
 ```bash
 pyinstaller -F -w -n HIDFirmwareUpdater main.py
 ```
@@ -285,109 +298,69 @@ pyinstaller -F -w -n HIDFirmwareUpdater main.py
 - `-w`：隱藏控制台視窗（純 GUI 應用）
 - `-n`：指定輸出檔名
 
-### 6.3 處理額外資源（如 `.ui` 檔案）
-如果你不想用 `pyside6-uic` 轉換為 `.py`，而是動態載入 `.ui`，則需將 `.ui` 檔案加入打包。但根據上述流程，我們已將 UI 轉為 Python 程式碼，故無需額外處理。
-
-### 6.4 打包後測試
-在 `dist` 資料夾中找到 `HIDFirmwareUpdater.exe`，雙擊執行，應出現你的應用程式視窗。
-
-### 6.5 使用 UPX 壓縮執行檔（選用）
-PyInstaller 支援使用 UPX (Ultimate Packer for eXecutables) 來進一步壓縮生成的執行檔，這可以顯著減少 `.exe` 的檔案大小。
-
-1. **下載 UPX**：前往 [UPX 官方 GitHub Release](https://github.com/upx/upx/releases) 下載 Windows 版本的壓縮檔（例如 `upx-x.xx-win64.zip`）。
-2. **解壓縮**：將下載的檔案解壓縮，將包含 `upx.exe` 的資料夾放置在方便引用的位置（例如專案根目錄下建立一個 `tools` 資料夾放入）。
-3. **打包時指定 UPX 路徑**：
-   在執行 PyInstaller 打包命令時，加上 `--upx-dir` 參數，並指定 `upx.exe` 所在的**資料夾路徑**。例如：
-   ```bash
-   pyinstaller -F -w -n HIDFirmwareUpdater --upx-dir="tools" main.py
-   ```
-4. **注意事項**：使用 UPX 壓縮有時可能會被部分防毒軟體誤判為惡意程式，或在程式啟動時增加極短暫的解壓縮時間。請依實際需求評估是否使用。
-5. **商用授權說明**：UPX 本身是基於 GPL 開源授權，但官方提供了特別例外條款 (Special Exception)。只要您單純使用 UPX 壓縮執行檔，且未修改 UPX 自身的原始碼，您可以**免費將 UPX 應用於商業或閉源軟體**，且不會受到 GPL 的傳染性限制（亦即不強制要求您的商業軟體必須開源）。
-
-### 6.6 進階：使用 7-Zip 製作自解壓縮檔 (SFX) 替代 UPX
-
-現代 PyInstaller 產生的執行檔預設啟用了 Windows 的 `GUARD_CF` (Control Flow Guard) 安全機制。這會導致 UPX 壓縮失敗（拋出 `CantPackException` 錯誤）。若強制壓縮不僅有破壞程式的風險，也容易遭防毒軟體誤判。
-如果您想獲得**極致的小檔案**，同時維持「**單一 .exe 點擊即執行**」的使用體驗，強烈建議使用 **7-Zip 的 SFX (自解壓縮)** 功能來取代 UPX。
-
-**與 UPX 的比較：**
-- **壓縮率更高**：7-Zip 的 LZMA 演算法能對整個資料夾的 DLL 進行極致壓縮。
-- **高穩定性與安全性**：不修改原本的 `.exe` 內部結構，不影響 `GUARD_CF` 安全機制。
-- **低誤判率**：防毒軟體對標準 7-Zip SFX 模組的接受度遠高於 UPX 壓縮檔。
-
-**製作步驟：**
-
-1. **改用「資料夾模式」打包**：
-   執行 PyInstaller 時，**去除** `-F` 參數。這會將程式與所有相依的 DLL 輸出為一個完整的資料夾。
-   ```bash
-   pyinstaller -w -n HIDFirmwareUpdater main.py
-   ```
-2. **準備設定檔 (`config.txt`)**：
-   在專案目錄下建立一個純文字檔，命名為 `config.txt`，確保以 **UTF-8** 編碼儲存，並填入以下內容：
-   ```text
-   ;!@Install@!UTF-8!
-   Title="HID Firmware Updater"
-   RunProgram="HIDFirmwareUpdater.exe"
-   ;!@InstallEnd@!
-   ```
-3. **打包成 `.7z` 壓縮檔**：
-   進入 PyInstaller 輸出的 `dist\HIDFirmwareUpdater` **資料夾內部**，全選所有檔案，點擊右鍵使用 7-Zip 將其壓縮為 `app.7z`（建議選擇最高壓縮等級 LZMA 或 LZMA2）。
-4. **取得 `7zS.sfx` 模組**：
-   到您的 7-Zip 安裝目錄（通常是 `C:\Program Files\7-Zip` 或可以從官網下載 7z Extra 包），找到並複製 `7zS.sfx` 這個檔案。
-5. **合併為最終執行檔**：
-   將 `7zS.sfx`、`config.txt` 以及 `app.7z` 這三個檔案放在同一個目錄下。打開命令提示字元 (cmd)，進入該目錄並執行合併指令：
-   ```cmd
-   copy /b 7zS.sfx + config.txt + app.7z HIDFirmwareUpdater_Release.exe
-   ```
-   *(注意：必須使用 `cmd` 執行 `copy /b`，PowerShell 請改用 `cmd /c copy /b ...`)*
-
-完成！現在您得到的 `HIDFirmwareUpdater_Release.exe` 是一個體積極小的單一執行檔。使用者雙擊時，它會在背景迅速解壓到 `%TEMP%` 並自動啟動您的韌體更新工具。
-
-
-### 6.7 終極方案：使用 Nuitka 編譯為原生程式
-
-如果您追求的是**「啟動速度最快」、「防毒軟體最不會誤判」、「程式碼最難被反組譯」**，目前 Python 生態圈中最專業的做法是使用 **Nuitka**。
-
-PyInstaller 的本質是「把 Python 直譯器和程式碼打包成壓縮檔」，執行時解壓縮再跑。而 **Nuitka** 則是會將您的 Python 程式碼**轉換成真正的 C 語言原始碼**，接著呼叫系統的 C 編譯器 (如 GCC 或 MSVC) 將其編譯成真正的機器碼二進位 `.exe`。
-
-**Nuitka 的優勢：**
-1. **點擊瞬間啟動**：不需在背景將龐大的環境解壓縮到暫存區。
-2. **極高的程式碼安全性**：轉為二進位機器碼後，幾乎無法被輕易反組譯回 `.py` 原始碼（若韌體更新工具有商業機密，Nuitka 是最佳解）。
-3. **防毒不誤判**：因為它不再是一個帶有引導程式的自解壓縮檔，而是一支單純的 C 程式。
-
-**安裝與使用 Nuitka：**
-
-1. 安裝套件：
-   ```bash
-   pip install nuitka
-   ```
-2. **使用自動化腳本編譯**：
-   為了方便重複編譯並自訂輸出檔名，專案內提供了兩個自動化腳本：
-   - Windows 原生 (CMD / PowerShell): `build_nuitka.bat`
-   - Unix/Git Bash 環境: `build_nuitka.sh`
-
-   您只需要在終端機執行腳本，並**傳入您想要的 .exe 檔名**做為參數即可：
-
-   **在 PowerShell 或 CMD 中：**
-   ```cmd
-   .\build_nuitka.bat HIDFirmwareUpdater
-   ```
-
-   **在 Git Bash 中：**
-   ```bash
-   ./build_nuitka.sh HIDFirmwareUpdater
-   ```
-
-   *腳本內部已設定好以下 Nuitka 最佳化參數：*
-   - `--standalone`：收集所有依賴的 DLL 和套件。
-   - `--onefile`：將所有內容合併為單一執行檔。
-   - `--enable-plugin=pyside6`：啟動 Nuitka 內建專為 PySide6 提供的最佳化與依賴收集外掛。
-   - `--windows-disable-console`：隱藏終端機視窗（等同於 PyInstaller 的 `-w`）。
-
-*(注意：Nuitka 的編譯過程可能耗時數分鐘至數十分鐘，且初次執行時若偵測不到 C 編譯器，會自動詢問並幫您下載 MinGW 系統環境)*
+### 6.3 打包後測試
+在 `dist` 資料夾中找到 `HIDFirmwareUpdater.exe`，雙擊執行，應出現您的應用程式視窗。
 
 ---
 
-## 7. 常見問題與排錯
+## 7. 封裝與發布：進階壓縮與最佳化
+
+產生的 `.exe` 檔案通常會有點大（包含 Python 環境與 Qt 庫）。這裡介紹兩種壓縮方案。
+
+### 7.1 使用 UPX 壓縮執行檔 (build_upx)
+UPX (Ultimate Packer for eXecutables) 可以在不改變執行方式的前提下，壓縮 `.exe` 的檔案大小。
+
+1. 前往 [UPX 官方 GitHub Release](https://github.com/upx/upx/releases) 下載 Windows 版，將 `upx.exe` 放入 `tools` 資料夾。
+2. 執行自動化腳本對 `dist` 資料夾內的執行檔進行最高等級壓縮：
+   ```cmd
+   .\build_upx.bat HIDFirmwareUpdater
+   ```
+*(注意：UPX 壓縮有時可能會被部分防毒軟體誤判為惡意程式，請依實際需求評估是否使用。UPX 本身允許免費應用於商業或閉源軟體)*
+
+### 7.2 使用 7-Zip 製作極致壓縮自解檔 (build_7z)
+現代 PyInstaller 的單一執行檔預設啟用了 Windows `GUARD_CF`，導致 UPX 容易壓縮失敗或被誤殺。
+如果您想獲得**極致的小檔案**，強烈建議使用 **7-Zip SFX (自解壓縮)** 功能來取代 UPX。
+
+**專案提供了 `build_7z.bat` 與 `build_7z.sh` 來全自動完成這件事：**
+1. 確保 `tools` 資料夾下有 `7zS.sfx` (可從 7-Zip 官網的 Extra 包取得)，以及 `7z.exe`。
+2. 執行自動化腳本：
+   ```cmd
+   .\build_7z.bat HIDFirmwareUpdater
+   ```
+腳本會自動使用 PyInstaller (資料夾模式) 打包、建立設定檔、使用 LZMA 最高壓縮率進行壓縮，最後合併為單一的 `_SFX.exe`。這不僅壓縮率遠勝 UPX，且防毒軟體誤判率極低。
+
+---
+
+## 8. 封裝與發布：終極方案 (Nuitka)
+
+如果您追求的是**「啟動速度最快」、「防毒軟體最不會誤判」、「程式碼最難被反組譯」**，目前業界最專業的做法是使用 **Nuitka**。
+
+### 8.1 Nuitka 原生編譯的優勢
+PyInstaller 的本質是「壓縮檔」，執行時需先解壓；而 **Nuitka** 會將 Python 程式碼**轉換成 C 語言原始碼**，接著編譯成真正的機器碼二進位 `.exe`。
+- **點擊瞬間啟動**：無需在背景解壓縮到暫存區。
+- **極高的安全性**：幾乎無法被輕易反組譯回 `.py` 原始碼。
+
+### 8.2 使用自動化腳本編譯 (build_nuitka)
+1. 安裝套件：`pip install nuitka`
+2. 執行專案提供的自動化腳本 (內建了 PySide6 最佳化參數，並自動輸出至 `dist` 資料夾)：
+   ```cmd
+   .\build_nuitka.bat HIDFirmwareUpdater
+   ```
+*(注意：Nuitka 的編譯過程可能耗時數分鐘至數十分鐘，且初次執行時會自動詢問並下載 MinGW C 編譯器環境)*
+
+### 8.3 關於 Nuitka 與 PySide6 的商用授權說明
+許多開發者擔心 Nuitka 編譯會違反開源授權。**簡單的答案是：不會，您可以合法且安心地將其用於商業閉源專案**。
+1. **Nuitka 授權**：基於 Apache License 2.0，允許商業與閉源使用。
+2. **Python 授權**：PSF License，允許商業閉源。
+3. **第三方套件授權 (關鍵)**：
+   - 本專案使用的 **`PySide6`** 是 **LGPL 授權**。LGPL 允許開發商業閉源軟體，**前提是必須使用動態連結 (Dynamic Linking)**。
+   - Nuitka 預設會將 `PySide6` 等 C/C++ 庫保留為獨立的動態連結庫（`.pyd`, `.dll`）並動態呼叫，這完全符合 LGPL 的規範。
+
+**結論**：只要您使用的是 `PySide6`，且沒有修改其底層 C++ 原始碼，您就可以合法地使用 Nuitka 將軟體編譯發布為商業閉源產品。（建議在軟體的「關於」頁面中聲明使用了 PySide6）
+
+---
+
+## 9. 常見問題與排錯
 
 ### Q1: 執行 `pyside6-designer` 找不到命令？
 - 確保 Python Scripts 目錄已加入 PATH（可重新安裝 PySide6 或使用 `python -m PySide6.scripts.pyside6_designer` 替代）
@@ -420,7 +393,7 @@ PyInstaller 的本質是「把 Python 直譯器和程式碼打包成壓縮檔」
 
 ---
 
-## 8. 清理專案暫存檔案
+## 10. 清理專案暫存檔案
 
 在使用 PyInstaller 或 Nuitka 進行編譯後，專案目錄中會產生大量的暫存檔與資料夾（例如 `build/`, `dist/`, `.spec`, `__pycache__` 等）。這些檔案會佔用大量硬碟空間，且不應該被納入 Git 版本控制。
 
@@ -431,7 +404,7 @@ PyInstaller 的本質是「把 Python 直譯器和程式碼打包成壓縮檔」
 
 ---
 
-## 📁 專案結構建議
+## 11. 專案結構建議
 ```
 project/
 ├── main.py                 # 啟動入口
@@ -448,7 +421,7 @@ project/
 
 ---
 
-## 🎯 總結
+## 12. 總結
 
 你現在已經學會如何：
 - 使用 **Qt Designer** 快速設計 GUI
