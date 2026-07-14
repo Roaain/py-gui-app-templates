@@ -1,0 +1,4 @@
+hidapi>=0.14.0
+PySide6>=6.5
+pyinstaller>=6.0
+nuitka>=2.0
